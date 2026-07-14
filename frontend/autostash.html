@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AutoStash — Debt Payoff Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --yellow:#D7D42B;
+    --yellow-deep:#C4C122;
+    --ink:#15150F;
+    --cream:#F3EEE1;
+    --white:#FFFFFF;
+    --coral:#E2896D;
+    --green:#2E7D32;
+    --line: rgba(21,21,15,0.14);
+    --line-strong: rgba(21,21,15,0.28);
+    --mono: 'JetBrains Mono', monospace;
+    --display: 'Big Shoulders Display', sans-serif;
+    --body: 'Inter', sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  body{
+    margin:0;
+    font-family:var(--body);
+    color:var(--ink);
+    background:var(--cream);
+  }
+  ::selection{ background:var(--ink); color:var(--yellow); }
+
+  a, button, input, select{ font-family:inherit; }
+  button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible{
+    outline:3px solid var(--ink);
+    outline-offset:2px;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; scroll-behavior:auto !important; }
+  }
+
+  /* ---------- HERO ---------- */
+  .hero{
+    background:var(--yellow);
+    padding:56px 6vw 64px;
+    display:grid;
+    grid-template-columns:1.3fr 1fr;
+    gap:40px;
+    align-items:end;
+    position:relative;
+    overflow:hidden;
+  }
+  .hero::after{
+    content:"";
+    position:absolute; inset:0;
+    background-image:repeating-linear-gradient(90deg, rgba(21,21,15,0.045) 0 1px, transparent 1px 68px);
+    pointer-events:none;
+  }
+  .brand-row{
+    display:flex; align-items:center; gap:10px;
+    font-family:var(--mono); font-weight:700; font-size:12px;
+    letter-spacing:.14em; text-transform:uppercase;
+    margin-bottom:18px;
+    color:rgba(21,21,15,0.75);
+  }
+  .brand-row .dot{ width:8px; height:8px; border-radius:50%; background:var(--ink); display:inline-block; }
+  h1.wordmark{
+    font-family:var(--display);
+    font-weight:900;
+    font-size:clamp(64px, 10vw, 132px);
+    line-height:0.82;
+    letter-spacing:-0.01em;
+    margin:0;
+    text-transform:uppercase;
+  }
+  .tagline{
+    font-family:var(--mono);
+    font-weight:500;
+    font-size:14px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    margin:18px 0 0;
+    color:rgba(21,21,15,0.8);
+  }
+  .tagline b{ color:var(--ink); border-bottom:2px solid var(--ink); }
+
+  .instrument{
+    background:var(--white);
+    border:2px solid var(--ink);
+    padding:22px 22px 18px;
+    position:relative;
+    min-width:0;
+  }
+  .instrument-label{
+    font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:rgba(21,21,15,0.6); display:flex; justify-content:space-between; margin-bottom:6px;
+  }
+  .instrument-label .live{ color:var(--green); }
+  .instrument-label .live::before{ content:"●"; margin-right:5px; font-size:9px; }
+  .instrument-label .live.offline{ color:rgba(21,21,15,0.4); }
+  .instrument-figure{
+    font-family:var(--display); font-weight:800; font-size:clamp(40px,5.4vw,58px);
+    line-height:1; margin:4px 0 10px;
+    font-variant-numeric:tabular-nums;
+  }
+  .instrument-figure span{ font-size:0.42em; font-family:var(--mono); font-weight:500; vertical-align:middle; }
+  .spark{ width:100%; height:44px; display:block; }
+  .instrument-breakdown{
+    margin-top:14px; padding-top:12px; border-top:1px solid var(--line);
+    font-family:var(--mono); font-size:11.5px; color:rgba(21,21,15,0.75);
+    display:grid; gap:4px;
+  }
+  .instrument-breakdown .row{ display:flex; justify-content:space-between; }
+  .instrument-breakdown .row b{ color:var(--ink); font-weight:600; }
+
+  /* ---------- CONNECTION BAR ---------- */
+  .connbar{
+    background:var(--ink); color:var(--cream);
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    padding:12px 6vw;
+    font-family:var(--mono); font-size:12px;
+  }
+  .connbar .lbl{ text-transform:uppercase; letter-spacing:.1em; opacity:.6; white-space:nowrap; }
+  .connbar input{
+    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.25); color:var(--cream);
+    padding:7px 10px; font-family:var(--mono); font-size:12px; min-width:240px; flex:1; max-width:360px;
+  }
+  .connbar input:focus-visible{ outline:2px solid var(--yellow); }
+  .connbar button{
+    background:var(--yellow); color:var(--ink); border:none; padding:8px 16px;
+    font-family:var(--mono); font-weight:700; font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; cursor:pointer;
+  }
+  .connbar button:hover{ background:var(--coral); }
+  .connbar .status{ display:flex; align-items:center; gap:7px; margin-left:auto; white-space:nowrap; }
+  .connbar .status .sdot{ width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.35); }
+  .connbar .status.ok .sdot{ background:#7CD98B; }
+  .connbar .status.err .sdot{ background:var(--coral); }
+
+  /* ---------- NAV ---------- */
+  .navbar{
+    background:var(--cream);
+    border-bottom:1px solid var(--line-strong);
+    position:sticky; top:0; z-index:20;
+    display:flex; gap:2px; padding:0 6vw;
+    overflow-x:auto;
+  }
+  .navbar button{
+    background:none; border:none; cursor:pointer;
+    font-family:var(--body); font-weight:800; font-size:15px;
+    text-transform:uppercase; letter-spacing:.02em;
+    padding:18px 18px 15px;
+    color:rgba(21,21,15,0.45);
+    border-bottom:3px solid transparent;
+    white-space:nowrap;
+  }
+  .navbar button.active{ color:var(--ink); border-bottom-color:var(--coral); }
+  .navbar button:hover{ color:var(--ink); }
+
+  main{ padding:52px 6vw 100px; max-width:1280px; margin:0 auto; }
+  .panel{ display:none; }
+  .panel.active{ display:block; animation:fade .35s ease; }
+  @keyframes fade{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  .eyebrow{
+    font-family:var(--mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+    color:rgba(21,21,15,0.55); margin:0 0 10px;
+  }
+  h2.section-title{
+    font-family:var(--display); font-weight:800; font-size:clamp(30px,4vw,46px);
+    text-transform:uppercase; line-height:0.95; margin:0 0 28px; letter-spacing:-.01em;
+  }
+
+  .grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:48px; }
+  .grid-3{ display:grid; grid-template-columns:repeat(3,1fr); gap:28px; }
+  @media(max-width:860px){ .grid-2, .grid-3{ grid-template-columns:1fr; } .hero{ grid-template-columns:1fr; } }
+
+  p.copy{ font-size:16px; line-height:1.65; color:rgba(21,21,15,0.82); margin:0 0 16px; max-width:60ch; }
+
+  .step{ display:flex; gap:16px; padding:20px 0; border-top:1px solid var(--line); }
+  .step:last-child{ border-bottom:1px solid var(--line); }
+  .step .num{ font-family:var(--display); font-weight:800; font-size:34px; color:var(--yellow-deep); -webkit-text-stroke:1.5px var(--ink); min-width:56px; }
+  .step h3{ margin:0 0 4px; font-size:17px; text-transform:uppercase; letter-spacing:.02em; }
+  .step p{ margin:0; font-size:14.5px; color:rgba(21,21,15,0.7); line-height:1.55; max-width:52ch; }
+
+  .card{ background:var(--white); border:1px solid var(--line-strong); padding:26px; }
+  .card + .card{ margin-top:18px; }
+  .card-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  .card-head h3{ font-family:var(--mono); font-size:13px; text-transform:uppercase; letter-spacing:.1em; margin:0; }
+
+  label{ display:block; font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:rgba(21,21,15,0.6); margin-bottom:6px; }
+  input[type=text], input[type=number], input[type=date]{
+    width:100%; padding:10px 12px; border:1.5px solid var(--ink); background:var(--cream);
+    font-size:14.5px; font-family:var(--body); font-weight:600;
+  }
+  .field{ margin-bottom:14px; }
+  .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--ink); color:var(--yellow);
+    border:none; padding:13px 22px; font-weight:800; font-size:14px;
+    text-transform:uppercase; letter-spacing:.06em; cursor:pointer;
+  }
+  .btn:hover{ background:var(--coral); color:var(--ink); }
+  .btn.ghost{ background:transparent; color:var(--ink); border:1.5px solid var(--ink); padding:11px 18px; }
+  .btn.ghost:hover{ background:var(--ink); color:var(--yellow); }
+  .btn.small{ padding:8px 14px; font-size:12px; }
+  .btn[disabled]{ opacity:.4; cursor:not-allowed; }
+
+  table{ width:100%; border-collapse:collapse; font-size:14px; }
+  th{ text-align:left; font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:rgba(21,21,15,0.55); padding:8px 6px; border-bottom:1.5px solid var(--ink); }
+  td{ padding:10px 6px; border-bottom:1px solid var(--line); font-weight:500; }
+  td.num{ font-variant-numeric:tabular-nums; font-family:var(--mono); }
+  tr:last-child td{ border-bottom:none; }
+  .row-remove{ background:none; border:none; cursor:pointer; color:rgba(21,21,15,0.4); font-size:16px; }
+  .row-remove:hover{ color:var(--coral); }
+
+  .stat-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line-strong); border:1px solid var(--line-strong); margin:26px 0; }
+  .stat{ background:var(--white); padding:22px 20px; }
+  .stat .eyebrow{ margin-bottom:8px; }
+  .stat .value{ font-family:var(--display); font-weight:800; font-size:clamp(26px,3vw,36px); line-height:1; }
+  .stat .value small{ font-family:var(--mono); font-size:14px; font-weight:500; }
+
+  .slider-row{ display:flex; align-items:center; gap:16px; margin-bottom:22px; }
+  input[type=range]{ flex:1; accent-color:var(--ink); }
+  .slider-value{ font-family:var(--display); font-weight:800; font-size:26px; min-width:110px; text-align:right; }
+
+  .chart-wrap{ background:var(--white); border:1px solid var(--line-strong); padding:24px; margin-bottom:24px; }
+  .chart-wrap canvas{ max-height:340px; }
+
+  .order-list{ display:flex; flex-wrap:wrap; gap:10px; }
+  .order-list .chip{ font-family:var(--mono); font-size:12.5px; padding:8px 14px; background:var(--yellow); border:1.5px solid var(--ink); font-weight:700; }
+  .order-list .chip .n{ opacity:.55; margin-right:6px; }
+
+  .empty{ font-family:var(--mono); font-size:13px; color:rgba(21,21,15,0.5); padding:24px 0; text-align:center; border:1.5px dashed var(--line-strong); }
+
+  .log-entry{ border-top:1px solid var(--line); padding:18px 0; display:grid; grid-template-columns:110px 1fr 160px; gap:18px; align-items:start; }
+  .log-entry:first-child{ border-top:none; }
+  .log-entry .date{ font-family:var(--mono); font-size:12px; color:rgba(21,21,15,0.55); padding-top:2px; }
+  .log-entry .alloc-line{ display:flex; justify-content:space-between; font-size:13.5px; padding:3px 0; }
+  .log-entry .swept{ text-align:right; font-family:var(--display); font-weight:800; font-size:22px; }
+
+  .source-tag{ display:inline-block; font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; padding:3px 8px; border:1px solid var(--line-strong); margin-left:10px; vertical-align:middle; color:rgba(21,21,15,0.55); }
+  .source-tag.live{ border-color:var(--green); color:var(--green); }
+
+  footer{ padding:34px 6vw; font-family:var(--mono); font-size:11.5px; color:rgba(21,21,15,0.5); text-transform:uppercase; letter-spacing:.08em; border-top:1px solid var(--line-strong); }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div>
+    <div class="brand-row"><span class="dot"></span> AUTOMATED CASH-FLOW ENGINE</div>
+    <h1 class="wordmark">Auto<br/>Stash</h1>
+    <p class="tagline">Debt payoff, optimized daily — <b>avalanche method</b></p>
+  </div>
+  <div class="instrument">
+    <div class="instrument-label"><span>Safe to sweep today</span><span class="live offline" id="heroLive">local sim</span></div>
+    <div class="instrument-figure"><span>$</span><span id="heroFigure">0.00</span></div>
+    <svg class="spark" id="heroSpark" viewBox="0 0 300 44" preserveAspectRatio="none"></svg>
+    <div class="instrument-breakdown">
+      <div class="row"><span>Checking balance</span><b id="bdBalance">—</b></div>
+      <div class="row"><span>Safety buffer</span><b id="bdBuffer">—</b></div>
+      <div class="row"><span>Bills due in 5 days</span><b id="bdBills">—</b></div>
+      <div class="row"><span>Daily cap (25%)</span><b id="bdCap">—</b></div>
+    </div>
+  </div>
+</section>
+
+<div class="connbar">
+  <span class="lbl">Django API</span>
+  <input type="text" id="apiBaseInput" value="http://localhost:8000/api" spellcheck="false">
+  <button id="connectBtn">Connect</button>
+  <div class="status" id="connStatus"><span class="sdot"></span><span id="connStatusText">Offline — using local simulation</span></div>
+</div>
+
+<nav class="navbar">
+  <button class="active" data-panel="overview">Overview</button>
+  <button data-panel="profile">Profile</button>
+  <button data-panel="plan">Payoff Plan</button>
+  <button data-panel="sweep">Sweep Log</button>
+</nav>
+
+<main>
+
+  <!-- OVERVIEW -->
+  <section class="panel active" id="panel-overview">
+    <p class="eyebrow">How it works</p>
+    <h2 class="section-title">Three moves,<br/>every single day</h2>
+    <div class="grid-2">
+      <div>
+        <p class="copy">AutoStash watches your checking account the way a careful friend would: it never sweeps a dollar that a bill might need first. What's left over gets pushed straight at your most expensive debt.</p>
+        <p class="copy">The math is the same each day — measure what's safe, rank the debt, sweep and allocate. No manual transfers, no guesswork about which card to pay down first.</p>
+        <p class="copy">This dashboard can run entirely offline in your browser, or connect to the real Django API below for persisted, database-backed calculations.</p>
+      </div>
+      <div>
+        <div class="step">
+          <div class="num">01</div>
+          <div><h3>Measure safe cash</h3><p>Checking balance, minus your safety buffer, minus anything due in the next 5 days. Capped at 25% of the balance so no single sweep goes too far.</p></div>
+        </div>
+        <div class="step">
+          <div class="num">02</div>
+          <div><h3>Rank the debt</h3><p>Cards are sorted highest-APR first. That's the avalanche method — it minimizes total interest paid versus paying off small balances first.</p></div>
+        </div>
+        <div class="step">
+          <div class="num">03</div>
+          <div><h3>Sweep &amp; allocate</h3><p>The safe amount is pulled and dropped onto the top card. Overflow past that card's balance cascades to the next one.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROFILE -->
+  <section class="panel" id="panel-profile">
+    <p class="eyebrow">Your numbers</p>
+    <h2 class="section-title">Set up the profile</h2>
+    <div class="grid-2">
+      <div>
+        <div class="card">
+          <div class="card-head"><h3>Income &amp; buffer</h3></div>
+          <div class="field-row">
+            <div class="field"><label for="income">Monthly income</label><input type="number" id="income" value="5000"></div>
+            <div class="field"><label for="buffer">Safety buffer</label><input type="number" id="buffer" value="150"></div>
+          </div>
+          <div class="field"><label for="checking">Checking balance (today)</label><input type="number" id="checking" value="2200"></div>
+          <div class="field"><label for="asOfDate">As-of date</label><input type="date" id="asOfDate"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>Bills</h3><button class="btn small ghost" id="addBill">+ Add bill</button></div>
+          <table>
+            <thead><tr><th>Name</th><th>Amount</th><th>Due day</th><th></th></tr></thead>
+            <tbody id="billsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="card-head"><h3>Credit cards</h3><button class="btn small ghost" id="addCard">+ Add card</button></div>
+          <table>
+            <thead><tr><th>Name</th><th>Balance</th><th>APR%</th><th>Min pmt</th><th></th></tr></thead>
+            <tbody id="cardsBody"></tbody>
+          </table>
+        </div>
+        <p class="copy" style="margin-top:16px;">These numbers feed every calculation on the Payoff Plan and Sweep Log tabs — update them any time.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLAN -->
+  <section class="panel" id="panel-plan">
+    <p class="eyebrow">Debt avalanche</p>
+    <h2 class="section-title">The full payoff plan <span class="source-tag" id="planSourceTag">local sim</span></h2>
+
+    <div class="slider-row">
+      <label style="margin:0; min-width:170px;">Extra monthly payment</label>
+      <input type="range" id="extraSlider" min="0" max="1000" step="10" value="300">
+      <div class="slider-value">$<span id="extraValue">300</span></div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><p class="eyebrow">Months to debt-free</p><div class="value" id="statMonths">—</div></div>
+      <div class="stat"><p class="eyebrow">Total interest paid</p><div class="value" id="statInterest">—</div></div>
+      <div class="stat"><p class="eyebrow">This month goes to</p><div class="value" id="statTopCard" style="font-size:22px;">—</div></div>
+    </div>
+
+    <div class="chart-wrap">
+      <canvas id="payoffChart"></canvas>
+    </div>
+
+    <p class="eyebrow">Payoff order (highest APR first)</p>
+    <div class="order-list" id="payoffOrder"></div>
+  </section>
+
+  <!-- SWEEP -->
+  <section class="panel" id="panel-sweep">
+    <p class="eyebrow">Simulate a day</p>
+    <h2 class="section-title">Run today's sweep <span class="source-tag" id="sweepSourceTag">local sim</span></h2>
+    <button class="btn" id="runSweep">Simulate sweep →</button>
+    <p class="copy" style="margin-top:18px;">Uses the checking balance and date set in Profile. When connected to the API, each run is persisted server-side as a real <code>SweepEvent</code>.</p>
+
+    <div id="sweepLog" style="margin-top:30px;"></div>
+  </section>
+
+</main>
+
+<footer>AutoStash — connect the Django API above, or run entirely offline.</footer>
+
+<script>
+(function(){
+
+  /* ---------------- state ---------------- */
+  let bills = [
+    {id:1, name:'Rent', amount:1500, day:1},
+    {id:2, name:'Electric', amount:80, day:20},
+  ];
+  let cards = [
+    {id:1, name:'Chase Sapphire', balance:4200, apr:24.99, minPayment:90},
+    {id:2, name:'Amex Blue', balance:1800, apr:19.99, minPayment:45},
+  ];
+  let nextBillId = 3, nextCardId = 3;
+  let sweepHistory = [];
+
+  let apiBase = null;       // set once "Connect" succeeds
+  let connected = false;
+  let profileId = null;
+  const USERNAME = 'kizie'; // fixed demo username for the single-profile dashboard
+
+  const $ = (sel) => document.querySelector(sel);
+  const fmt = (n) => Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  const today = new Date();
+  $('#asOfDate').value = today.toISOString().slice(0,10);
+
+  /* ================= LOCAL ENGINE (fallback, mirrors engine/services.py) ================= */
+  function daysInMonth(year, monthIndex){ return new Date(year, monthIndex+1, 0).getDate(); }
+
+  function upcomingBillsTotal(billsList, asOf, lookaheadDays){
+    const dim = daysInMonth(asOf.getFullYear(), asOf.getMonth());
+    let total = 0; const detail = [];
+    billsList.forEach(b=>{
+      const dueDay = Math.min(b.day, dim);
+      let delta = dueDay - asOf.getDate();
+      if(delta < 0) delta += dim;
+      if(delta <= lookaheadDays){ total += Number(b.amount); detail.push({name:b.name, amount:Number(b.amount), daysUntilDue:delta}); }
+    });
+    return {total, detail};
+  }
+
+  function localSafeToSweep(billsList, buffer, checkingBalance, asOf){
+    const lookahead = 5, maxFraction = 0.25;
+    const {total, detail} = upcomingBillsTotal(billsList, asOf, lookahead);
+    const raw = checkingBalance - buffer - total;
+    const cap = checkingBalance * maxFraction;
+    const safe = Math.max(0, Math.min(raw, cap));
+    return {safe, breakdown:{checkingBalance, buffer, billsTotal:total, billsDetail:detail, lookahead, raw, cap}};
+  }
+
+  function localAllocateAvalanche(cardsList, extra){
+    if(!cardsList.length || extra <= 0) return [];
+    const sorted = [...cardsList].sort((a,b)=>b.apr - a.apr);
+    let remaining = extra;
+    const out = [];
+    for(const c of sorted){
+      if(remaining <= 0) break;
+      const pay = Math.min(remaining, c.balance);
+      if(pay > 0){ out.push({id:c.id, name:c.name, amount:pay}); remaining -= pay; }
+    }
+    return out;
+  }
+
+  function localFullProjection(cardsList, monthlyExtra, maxMonths){
+    maxMonths = maxMonths || 480;
+    if(!cardsList.length){ return {months:0, totalInterest:0, payoffOrder:[], history:[], order:[], names:{}}; }
+    const sorted = [...cardsList].sort((a,b)=>b.apr - a.apr);
+    const balances = {}; const minPay = {}; const rate = {}; const names = {};
+    sorted.forEach(c=>{ balances[c.id]=c.balance; minPay[c.id]=c.minPayment; rate[c.id]=c.apr/100/12; names[c.id]=c.name; });
+    const order = sorted.map(c=>c.id);
+    let totalInterest = 0, months = 0;
+    const payoffOrder = [];
+    const history = [{month:0, balances:{...balances}}];
+
+    while(order.some(id=>balances[id] > 0.01) && months < maxMonths){
+      months++;
+      let extraPool = monthlyExtra;
+      order.forEach(id=>{
+        if(balances[id] <= 0) return;
+        const interest = balances[id]*rate[id];
+        totalInterest += interest;
+        balances[id] += interest;
+        const pay = Math.min(minPay[id], balances[id]);
+        balances[id] -= pay;
+      });
+      order.forEach(id=>{
+        if(extraPool <= 0) return;
+        if(balances[id] <= 0) return;
+        const pay = Math.min(extraPool, balances[id]);
+        balances[id] -= pay; extraPool -= pay;
+      });
+      order.forEach(id=>{
+        if(balances[id] <= 0.01 && !payoffOrder.includes(names[id])) payoffOrder.push(names[id]);
+      });
+      history.push({month:months, balances:{...balances}});
+    }
+    return {months: months < maxMonths ? months : null, totalInterest, payoffOrder, history, order, names};
+  }
+
+  /* ================= API LAYER ================= */
+  async function apiFetch(path, opts){
+    const res = await fetch(apiBase + path, Object.assign({
+      headers:{'Content-Type':'application/json'},
+    }, opts));
+    if(!res.ok){ const text = await res.text().catch(()=> ''); throw new Error('HTTP '+res.status+' '+text); }
+    if(res.status === 204) return null;
+    return res.json();
+  }
+
+  async function testConnection(base){
+    const res = await fetch(base + '/profiles/');
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    return true;
+  }
+
+  async function ensureRemoteProfile(){
+    const data = await apiFetch('/profiles/', {
+      method:'POST',
+      body: JSON.stringify({
+        username: USERNAME,
+        monthly_income: Number($('#income').value),
+        safety_buffer: Number($('#buffer').value),
+      }),
+    });
+    profileId = data.id;
+    // If the server already has bills/cards saved from a previous session, adopt them.
+    if(data.bills && data.bills.length){
+      bills = data.bills.map(b=>({id:b.id, name:b.name, amount:Number(b.amount), day:b.due_day}));
+    } else {
+      // otherwise push our current local defaults up to the server
+      for(const b of bills){
+        const created = await apiFetch(`/profiles/${profileId}/bills/`, {
+          method:'POST',
+          body: JSON.stringify({name:b.name, amount:b.amount, due_day:b.day, is_recurring:true}),
+        });
+        b.id = created.id;
+      }
+    }
+    if(data.credit_cards && data.credit_cards.length){
+      cards = data.credit_cards.map(c=>({id:c.id, name:c.name, balance:Number(c.balance), apr:Number(c.apr), minPayment:Number(c.min_payment)}));
+    } else {
+      for(const c of cards){
+        const created = await apiFetch(`/profiles/${profileId}/credit-cards/`, {
+          method:'POST',
+          body: JSON.stringify({name:c.name, balance:c.balance, apr:c.apr, min_payment:c.minPayment}),
+        });
+        c.id = created.id;
+      }
+    }
+  }
+
+  function setConnStatus(state, text){
+    const el = $('#connStatus');
+    el.classList.remove('ok','err');
+    if(state) el.classList.add(state);
+    $('#connStatusText').textContent = text;
+    document.querySelectorAll('.source-tag').forEach(t=>{
+      t.textContent = connected ? 'live api' : 'local sim';
+      t.classList.toggle('live', connected);
+    });
+    $('#heroLive').textContent = connected ? 'live api' : 'local sim';
+    $('#heroLive').classList.toggle('offline', !connected);
+  }
+
+  $('#connectBtn').addEventListener('click', async ()=>{
+    const base = $('#apiBaseInput').value.replace(/\/$/, '');
+    setConnStatus(null, 'Connecting…');
+    try{
+      await testConnection(base);
+      apiBase = base;
+      await ensureRemoteProfile();
+      connected = true;
+      setConnStatus('ok', 'Connected to Django API');
+      renderBills(); renderCards();
+      recalcAll();
+      if(document.getElementById('panel-plan').classList.contains('active')) renderPlan();
+      if(document.getElementById('panel-sweep').classList.contains('active')) renderSweepLog();
+    }catch(err){
+      connected = false; apiBase = null;
+      setConnStatus('err', 'Could not connect — using local simulation');
+    }
+  });
+
+  /* ---------------- bills / cards tables ---------------- */
+  function renderBills(){
+    const body = $('#billsBody'); body.innerHTML = '';
+    bills.forEach(b=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" value="${b.name}" data-field="name" style="border:none;background:none;padding:2px;font-weight:600;"></td>
+        <td class="num"><input type="number" value="${b.amount}" data-field="amount" style="border:none;background:none;padding:2px;width:80px;font-family:inherit;"></td>
+        <td class="num"><input type="number" value="${b.day}" min="1" max="31" data-field="day" style="border:none;background:none;padding:2px;width:56px;font-family:inherit;"></td>
+        <td><button class="row-remove" aria-label="Remove ${b.name}">✕</button></td>`;
+      tr.querySelectorAll('input').forEach(inp=>{
+        inp.addEventListener('change', async ()=>{
+          const f = inp.dataset.field;
+          b[f] = f==='name' ? inp.value : Number(inp.value);
+          if(connected){
+            const payload = f==='day' ? {due_day:b.day} : {[f]: b[f]};
+            try{ await apiFetch(`/profiles/${profileId}/bills/${b.id}/`, {method:'PATCH', body:JSON.stringify(payload)}); }catch(e){}
+          }
+          recalcAll();
+        });
+      });
+      tr.querySelector('.row-remove').addEventListener('click', async ()=>{
+        if(connected){ try{ await apiFetch(`/profiles/${profileId}/bills/${b.id}/`, {method:'DELETE'}); }catch(e){} }
+        bills = bills.filter(x=>x.id!==b.id); renderBills(); recalcAll();
+      });
+      body.appendChild(tr);
+    });
+    if(!bills.length) body.innerHTML = '<tr><td colspan="4" class="empty">No bills yet</td></tr>';
+  }
+
+  function renderCards(){
+    const body = $('#cardsBody'); body.innerHTML = '';
+    cards.forEach(c=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" value="${c.name}" data-field="name" style="border:none;background:none;padding:2px;font-weight:600;"></td>
+        <td class="num"><input type="number" value="${c.balance}" data-field="balance" style="border:none;background:none;padding:2px;width:80px;font-family:inherit;"></td>
+        <td class="num"><input type="number" value="${c.apr}" step="0.01" data-field="apr" style="border:none;background:none;padding:2px;width:60px;font-family:inherit;"></td>
+        <td class="num"><input type="number" value="${c.minPayment}" data-field="minPayment" style="border:none;background:none;padding:2px;width:64px;font-family:inherit;"></td>
+        <td><button class="row-remove" aria-label="Remove ${c.name}">✕</button></td>`;
+      tr.querySelectorAll('input').forEach(inp=>{
+        inp.addEventListener('change', async ()=>{
+          const f = inp.dataset.field;
+          c[f] = f==='name' ? inp.value : Number(inp.value);
+          if(connected){
+            const payload = f==='minPayment' ? {min_payment:c.minPayment} : {[f]: c[f]};
+            try{ await apiFetch(`/profiles/${profileId}/credit-cards/${c.id}/`, {method:'PATCH', body:JSON.stringify(payload)}); }catch(e){}
+          }
+          recalcAll();
+        });
+      });
+      tr.querySelector('.row-remove').addEventListener('click', async ()=>{
+        if(connected){ try{ await apiFetch(`/profiles/${profileId}/credit-cards/${c.id}/`, {method:'DELETE'}); }catch(e){} }
+        cards = cards.filter(x=>x.id!==c.id); renderCards(); recalcAll();
+      });
+      body.appendChild(tr);
+    });
+    if(!cards.length) body.innerHTML = '<tr><td colspan="5" class="empty">No credit cards yet</td></tr>';
+  }
+
+  $('#addBill').addEventListener('click', async ()=>{
+    const b = {id:nextBillId++, name:'New bill', amount:0, day:1};
+    if(connected){
+      try{
+        const created = await apiFetch(`/profiles/${profileId}/bills/`, {method:'POST', body:JSON.stringify({name:b.name, amount:b.amount, due_day:b.day, is_recurring:true})});
+        b.id = created.id;
+      }catch(e){}
+    }
+    bills.push(b); renderBills(); recalcAll();
+  });
+
+  $('#addCard').addEventListener('click', async ()=>{
+    const c = {id:nextCardId++, name:'New card', balance:0, apr:0, minPayment:0};
+    if(connected){
+      try{
+        const created = await apiFetch(`/profiles/${profileId}/credit-cards/`, {method:'POST', body:JSON.stringify({name:c.name, balance:c.balance, apr:c.apr, min_payment:c.minPayment})});
+        c.id = created.id;
+      }catch(e){}
+    }
+    cards.push(c); renderCards(); recalcAll();
+  });
+
+  /* ---------------- hero instrument ---------------- */
+  let sparkHistory = [];
+  let heroDebounce;
+  function updateHero(){
+    clearTimeout(heroDebounce);
+    heroDebounce = setTimeout(async ()=>{
+      const buffer = Number($('#buffer').value);
+      const checking = Number($('#checking').value);
+      const asOf = new Date($('#asOfDate').value + 'T00:00:00');
+      let safe, breakdown;
+
+      if(connected){
+        try{
+          const data = await apiFetch(`/profiles/${profileId}/safe-to-sweep-preview/`, {
+            method:'POST',
+            body: JSON.stringify({checking_balance:checking, date:$('#asOfDate').value}),
+          });
+          safe = data.amount_safe_to_sweep;
+          breakdown = {checkingBalance: data.breakdown.checking_balance, buffer: data.breakdown.safety_buffer, billsTotal: data.breakdown.upcoming_bills_total, cap: data.breakdown.daily_sweep_cap};
+        }catch(e){
+          const r = localSafeToSweep(bills, buffer, checking, asOf); safe = r.safe; breakdown = r.breakdown;
+        }
+      } else {
+        const r = localSafeToSweep(bills, buffer, checking, asOf); safe = r.safe; breakdown = r.breakdown;
+      }
+
+      $('#heroFigure').textContent = fmt(safe);
+      $('#bdBalance').textContent = '$'+fmt(breakdown.checkingBalance);
+      $('#bdBuffer').textContent = '$'+fmt(breakdown.buffer);
+      $('#bdBills').textContent = '$'+fmt(breakdown.billsTotal);
+      $('#bdCap').textContent = '$'+fmt(breakdown.cap);
+
+      sparkHistory.push(safe);
+      if(sparkHistory.length > 24) sparkHistory.shift();
+      drawSpark();
+    }, connected ? 300 : 0);
+  }
+
+  function drawSpark(){
+    const svg = $('#heroSpark');
+    const w = 300, h = 44;
+    const vals = sparkHistory.length ? sparkHistory : [0];
+    const max = Math.max(...vals, 1);
+    const min = Math.min(...vals, 0);
+    const range = (max-min) || 1;
+    const step = vals.length > 1 ? w/(vals.length-1) : w;
+    let d = '';
+    vals.forEach((v,i)=>{
+      const x = i*step;
+      const y = h - ((v-min)/range)*h*0.85 - 4;
+      d += (i===0? 'M':'L') + x.toFixed(1)+','+y.toFixed(1)+' ';
+    });
+    svg.innerHTML = `<path d="${d}" fill="none" stroke="#15150F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${((vals.length-1)*step).toFixed(1)}" cy="${(h - ((vals[vals.length-1]-min)/range)*h*0.85 - 4).toFixed(1)}" r="3.5" fill="#E2896D"/>`;
+  }
+
+  /* ---------------- payoff plan panel ---------------- */
+  let payoffChart;
+  async function renderPlan(){
+    const extra = Number($('#extraSlider').value);
+    $('#extraValue').textContent = extra;
+
+    let result, allocation;
+
+    if(connected){
+      try{
+        const data = await apiFetch(`/profiles/${profileId}/payoff-plan/`, {
+          method:'POST', body: JSON.stringify({extra_monthly_payment: extra}),
+        });
+        allocation = data.this_period_allocation.map(a=>({id:a.credit_card_id, name:a.name, amount:a.amount_allocated}));
+        const proj = data.full_projection;
+        // API returns summary only (months/interest/order), not month-by-month
+        // balances, so the chart itself is still drawn from the local simulator
+        // for a smooth curve — the headline numbers above it come from the server.
+        result = localFullProjection(cards, extra);
+        result.months = proj.months_to_payoff;
+        result.totalInterest = proj.total_interest_paid;
+        result.payoffOrder = proj.payoff_order;
+      }catch(e){
+        result = localFullProjection(cards, extra);
+        allocation = localAllocateAvalanche(cards, extra);
+      }
+    } else {
+      result = localFullProjection(cards, extra);
+      allocation = localAllocateAvalanche(cards, extra);
+    }
+
+    $('#statMonths').innerHTML = result.months ? result.months + '<small> mo</small>' : '<small style="font-size:16px;">600+ mo</small>';
+    $('#statInterest').textContent = '$'+fmt(result.totalInterest);
+    $('#statTopCard').textContent = allocation.length ? allocation[0].name : '—';
+
+    const orderWrap = $('#payoffOrder'); orderWrap.innerHTML = '';
+    if(!result.payoffOrder.length){
+      orderWrap.innerHTML = '<div class="empty" style="width:100%;">Add credit cards in the Profile tab to see a payoff order</div>';
+    } else {
+      result.payoffOrder.forEach((name,i)=>{
+        const chip = document.createElement('div');
+        chip.className = 'chip';
+        chip.innerHTML = `<span class="n">${String(i+1).padStart(2,'0')}</span>${name}`;
+        orderWrap.appendChild(chip);
+      });
+    }
+
+    const localForChart = localFullProjection(cards, extra);
+    const labels = localForChart.history.map(h=>'M'+h.month);
+    const datasets = (localForChart.order||[]).map((id,i)=>{
+      const palette = ['#15150F','#E2896D','#8A8F1E','#5C6B73','#B24C2E'];
+      return {
+        label: localForChart.names[id],
+        data: localForChart.history.map(h=>Math.max(0,h.balances[id])),
+        borderColor: palette[i%palette.length],
+        backgroundColor: 'transparent',
+        borderWidth: 2.5,
+        pointRadius: 0,
+        tension: 0.15,
+      };
+    });
+
+    const ctx = document.getElementById('payoffChart').getContext('2d');
+    if(payoffChart) payoffChart.destroy();
+    payoffChart = new Chart(ctx, {
+      type:'line',
+      data:{ labels, datasets },
+      options:{
+        responsive:true,
+        maintainAspectRatio:true,
+        interaction:{ mode:'index', intersect:false },
+        plugins:{
+          legend:{ labels:{ font:{family:'JetBrains Mono', size:11}, color:'#15150F', usePointStyle:true } },
+          tooltip:{ backgroundColor:'#15150F', titleFont:{family:'JetBrains Mono'}, bodyFont:{family:'JetBrains Mono'} },
+        },
+        scales:{
+          x:{ grid:{color:'rgba(21,21,15,0.08)'}, ticks:{font:{family:'JetBrains Mono', size:10}, maxTicksLimit:10} },
+          y:{ grid:{color:'rgba(21,21,15,0.08)'}, ticks:{font:{family:'JetBrains Mono', size:10}, callback:(v)=>'$'+v} },
+        }
+      }
+    });
+  }
+
+  $('#extraSlider').addEventListener('input', renderPlan);
+
+  /* ---------------- sweep log panel ---------------- */
+  async function renderSweepLog(){
+    if(connected){
+      try{
+        const data = await apiFetch(`/profiles/${profileId}/sweeps/`);
+        sweepHistory = data.map(s=>({
+          date: s.date,
+          amountSwept: Number(s.amount_swept),
+          allocation: Object.entries(s.allocations || {}).map(([cid, amt])=>{
+            const card = cards.find(c=>String(c.id)===String(cid));
+            return {name: card ? card.name : ('Card '+cid), amount:Number(amt)};
+          }),
+        }));
+      }catch(e){}
+    }
+    const wrap = $('#sweepLog');
+    if(!sweepHistory.length){ wrap.innerHTML = '<div class="empty">No sweeps simulated yet</div>'; return; }
+    wrap.innerHTML = sweepHistory.map(s=>{
+      const allocLines = s.allocation.length
+        ? s.allocation.map(a=>`<div class="alloc-line"><span>${a.name}</span><span class="num">$${fmt(a.amount)}</span></div>`).join('')
+        : '<div class="alloc-line" style="color:rgba(21,21,15,0.45);">Nothing safe to sweep</div>';
+      return `<div class="log-entry">
+        <div class="date">${s.date}</div>
+        <div>${allocLines}</div>
+        <div class="swept">$${fmt(s.amountSwept)}</div>
+      </div>`;
+    }).join('');
+  }
+
+  $('#runSweep').addEventListener('click', async ()=>{
+    const buffer = Number($('#buffer').value);
+    const checking = Number($('#checking').value);
+    const asOf = new Date($('#asOfDate').value + 'T00:00:00');
+
+    if(connected){
+      try{
+        await apiFetch(`/profiles/${profileId}/simulate-sweep/`, {
+          method:'POST',
+          body: JSON.stringify({checking_balance:checking, date:$('#asOfDate').value}),
+        });
+        await renderSweepLog();
+        return;
+      }catch(e){ /* fall through to local */ }
+    }
+    const {safe} = localSafeToSweep(bills, buffer, checking, asOf);
+    const allocation = localAllocateAvalanche(cards, safe);
+    sweepHistory.unshift({ date: $('#asOfDate').value, amountSwept: safe, allocation });
+    renderSweepLog();
+  });
+
+  /* ---------------- nav ---------------- */
+  document.querySelectorAll('.navbar button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.navbar button').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-'+btn.dataset.panel).classList.add('active');
+      if(btn.dataset.panel === 'plan') renderPlan();
+      if(btn.dataset.panel === 'sweep') renderSweepLog();
+    });
+  });
+
+  /* ---------------- profile field changes ---------------- */
+  async function pushProfileUpdate(){
+    if(!connected) return;
+    try{
+      await apiFetch('/profiles/', {
+        method:'POST',
+        body: JSON.stringify({username:USERNAME, monthly_income:Number($('#income').value), safety_buffer:Number($('#buffer').value)}),
+      });
+    }catch(e){}
+  }
+
+  function recalcAll(){
+    updateHero();
+  }
+  ['income','buffer'].forEach(id=>{
+    document.getElementById(id).addEventListener('change', ()=>{ pushProfileUpdate(); recalcAll(); });
+  });
+  ['checking','asOfDate'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', recalcAll);
+  });
+
+  /* ---------------- init ---------------- */
+  renderBills();
+  renderCards();
+  updateHero();
+  renderPlan();
+  renderSweepLog();
+
+})();
+</script>
+</body>
+</html>
