@@ -136,3 +136,38 @@ curl localhost:8000/api/profiles/1/sweeps/
   knobs to tune.
 - No auth is wired up (`AllowAny` in DRF settings) — add
   `IsAuthenticated` + token/session auth before this touches real data.
+
+## Deploying
+
+### API (Render — free tier works fine)
+
+1. Push this repo to GitHub.
+2. On [render.com](https://render.com) → **New → Web Service** → connect the `autostash` repo.
+3. Settings:
+   - **Build command**: `pip install -r requirements.txt && python manage.py collectstatic --noinput`
+   - **Start command**: `gunicorn autostash.wsgi`
+4. Add environment variables (Render dashboard → Environment):
+   - `SECRET_KEY` — any long random string
+   - `DEBUG` — `False`
+   - `ALLOWED_HOSTS` — the `.onrender.com` URL Render gives you, e.g. `autostash-api.onrender.com`
+   - `CORS_ALLOWED_ORIGINS` — wherever you host the frontend, e.g. `https://<you>.github.io`
+   - `CSRF_TRUSTED_ORIGINS` — same as above but with `https://` (needed if you use `/admin/`)
+5. Attach a free Postgres instance (Render → New → PostgreSQL) and Render will
+   auto-set `DATABASE_URL` — `dj-database-url` in `settings.py` picks it up
+   automatically, no code change needed. Without it, the app falls back to
+   SQLite, which **will not persist** on Render's ephemeral filesystem.
+6. Deploy. Migrations run automatically via the `release: python manage.py migrate`
+   line in the `Procfile`.
+
+Railway or Fly.io work the same way — same `Procfile`, same env vars.
+
+### Frontend (any static host)
+
+`frontend/autostash.html` has zero build step — any static host works:
+
+- **GitHub Pages**: Settings → Pages → deploy from the `main` branch, `/frontend` folder (or root, if you move the file there)
+- **Netlify / Vercel**: drag-and-drop the `frontend/` folder, or connect the repo and set the publish directory to `frontend`
+
+Once it's live, open it, paste your Render API URL + `/api` into the
+connection bar (e.g. `https://autostash-api.onrender.com/api`), and click
+**Connect**.
