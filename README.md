@@ -1,3 +1,12 @@
+## Live demo
+
+- **Dashboard:** [kaushhki.github.io/Autostash](https://kaushhki.github.io/Autostash/)
+- **API:** [autostash.onrender.com/api](https://autostash.onrender.com/api/)
+
+Open the dashboard, paste `https://autostash.onrender.com/api` into the
+connection bar, and hit **Connect**. Render's free tier spins down after
+inactivity, so the first request can take 30–50 seconds to wake up.
+
 # AutoStash — Automated Debt Payoff Optimization Engine
 
 Mimics the core Bright Money loop: sweep safe leftover cash out of checking,
